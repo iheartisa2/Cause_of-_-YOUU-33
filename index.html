@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>For<My little adorable princess🎀♥</title>
+    <style>
+        :root {
+            --bass-impact: 0;
+        }
+
+        body {
+            margin: 0;
+            background-color: #000;
+            color: #fff;
+            font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            perspective: 1000px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Video Background Styling */
+        #video-bg {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            z-index: -2;
+            transform: translate(-50%, -50%);
+            object-fit: cover;
+            filter: brightness(0.4) contrast(1.2); /* Darken video for lyric clarity */
+        }
+
+        /* Dark overlay to ensure text pop */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        #camera-rig {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform-style: preserve-3d;
+            will-change: transform;
+            /* Camera moves with bass */
+            transform: rotateY(calc(var(--bass-impact) * 0.02deg)) rotateX(calc(var(--bass-impact) * -0.01deg));
+        }
+
+        #lyric-display {
+            font-size: clamp(2.5rem, 8vw, 6rem);
+            font-weight: 900;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: -2px;
+            width: 85%;
+            margin: 0;
+            opacity: 0;
+            color: #fff;
+            text-shadow: 
+                0 0 10px rgba(255,255,255,0.8), 
+                0 0 30px rgba(255,255,255,0.4);
+            pointer-events: none;
+        }
+
+        .slide-in {
+            animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .slide-out {
+            animation: slideOut 0.5s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+        }
+
+        @keyframes slideIn {
+            0% { 
+                opacity: 0; 
+                transform: translateX(-100vw) translateZ(-300px) rotateY(45deg); 
+                filter: blur(20px) brightness(2);
+            }
+            100% { 
+                opacity: 1; 
+                transform: translateX(0) translateZ(0) rotateY(0deg); 
+                filter: blur(0px) brightness(1);
+            }
+        }
+
+        @keyframes slideOut {
+            0% { opacity: 1; transform: translateX(0); filter: blur(0px); }
+            100% { 
+                opacity: 0; 
+                transform: translateX(100vw) translateZ(-300px) rotateY(-45deg); 
+                filter: blur(15px);
+            }
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, transparent 20%, rgba(0,0,0,0.8) 100%);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        #ui { position: fixed; bottom: 30px; z-index: 100; opacity: 0.2; transition: 0.3s; }
+        #ui:hover { opacity: 1; }
+        button { background: none; border: 1px solid #fff; color: #fff; padding: 10px 25px; cursor: pointer; text-transform: uppercase; font-size: 11px; letter-spacing: 2px; }
+    </style>
+</head>
+<body>
+
+    <video id="video-bg" autoplay muted loop playsinline>
+        <source src="test.mp4" type="video/mp4">
+    </video>
+    <div class="overlay"></div>
+
+    <div id="camera-rig">
+        <h1 id="lyric-display"></h1>
+    </div>
+
+    <div id="ui">
+        <button id="playBtn">🎀♥🎀</button>
+        <audio id="audio" src="test.mp3"></audio>
+    </div>
+
+    <script>
+        const audio = document.getElementById('audio');
+        const playBtn = document.getElementById('playBtn');
+        const display = document.getElementById('lyric-display');
+        const rig = document.getElementById('camera-rig');
+        const video = document.getElementById('video-bg');
+        
+        let lyrics = [];
+        let currentIndex = -1;
+        let audioContext, analyser, dataArray;
+
+        async function loadLyrics() {
+            try {
+                const response = await fetch('test.srt');
+                const text = await response.text();
+                lyrics = parseSRT(text);
+            } catch (e) { display.innerText = "MISSING SRT"; display.style.opacity = 1; }
+        }
+
+        function parseSRT(data) {
+            const regex = /(\d+)\n(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})\n([\s\S]*?)(?=\n{2,}|\n*$)/g;
+            let m; const output = [];
+            while ((m = regex.exec(data)) !== null) {
+                output.push({ start: timeToSeconds(m[2]), end: timeToSeconds(m[3]), text: m[4].replace(/\n/g, ' ') });
+            }
+            return output;
+        }
+
+        function timeToSeconds(time) {
+            const parts = time.split(/:|,/);
+            return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]) + parseInt(parts[3]) / 1000;
+        }
+
+        function initAudio() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaElementSource(audio);
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 64; 
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+            render();
+        }
+
+        function render() {
+            requestAnimationFrame(render);
+            if (!analyser) return;
+            analyser.getByteFrequencyData(dataArray);
+            let bass = dataArray[0]; 
+            rig.style.setProperty('--bass-impact', bass);
+
+            const time = audio.currentTime;
+            const lineIndex = lyrics.findIndex(l => time >= l.start && time <= l.end);
+
+            if (lineIndex !== -1 && lineIndex !== currentIndex) {
+                display.classList.remove('slide-in');
+                display.classList.add('slide-out');
+                setTimeout(() => {
+                    currentIndex = lineIndex;
+                    display.innerText = lyrics[lineIndex].text;
+                    display.classList.remove('slide-out');
+                    void display.offsetWidth;
+                    display.classList.add('slide-in');
+                }, 150); 
+            } else if (lineIndex === -1 && currentIndex !== -1) {
+                display.classList.replace('slide-in', 'slide-out');
+                currentIndex = -1;
+            }
+        }
+
+        playBtn.addEventListener('click', () => {
+            if (!audioContext) initAudio();
+            if (audio.paused) {
+                audio.play();
+                video.play(); // Keep video in sync with start
+                playBtn.innerText = "PAUSE";
+            } else {
+                audio.pause();
+                video.pause();
+                playBtn.innerText = "PLAY";
+            }
+        });
+
+        loadLyrics();
+    </script>
+</body>
+</html>
